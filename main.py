@@ -1,3 +1,4 @@
+import os
 import random
 import requests
 from bs4 import BeautifulSoup
@@ -13,7 +14,7 @@ from telegram.ext import (
 )
 
 # ---------------------------------------------------------
-# 1. Credentials (သႂ်ႇ Key ၸဝ်ႈၵဝ်ႇ တီႈၼႆႈ)
+# 1. Credentials ( ဢဝ် တီႈ Koyeb Environment Variables )
 # ---------------------------------------------------------
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -32,10 +33,9 @@ HEADERS = {
 
 
 # ---------------------------------------------------------
-# 2. Dynamic Scrapers (ဢဝ် dynamic data တီႈ ဝဵပ်ႉ Wiktionary)
+# 2. Dynamic Scrapers
 # ---------------------------------------------------------
 def fetch_words_from_wiktionary():
-    """ ၵႂႃႇဢဝ် List ၶေႃႈၵႂၢမ်း တီႈ ဝဵပ်ႉ Wiktionary ၸဝ်ႈသြႃႇ Dynamic """
     words = []
     try:
         res = requests.get(WIKTIONARY_CAT_URL, headers=HEADERS, timeout=5)
@@ -51,7 +51,6 @@ def fetch_words_from_wiktionary():
     except Exception as e:
         print(f"❌ Scraper Warning: {e}")
 
-    # Fallback list ပေႃး Net Connection မီး ပိူင်ႈ
     if not words:
         words = [
             "မႂ်ႇသုင်",
@@ -67,7 +66,6 @@ def fetch_words_from_wiktionary():
 
 
 def get_wiktionary_word_data(word):
-    """ ႁႃ File သဵင် တီႈ ၼႃႈ Detail Wiktionary """
     url = f"https://shn.wiktionary.org/wiki/{word}"
     audio_url = None
     try:
@@ -79,7 +77,9 @@ def get_wiktionary_word_data(word):
                 source = audio_tag.find("source")
                 if source and source.get("src"):
                     src = source["src"]
-                    audio_url = src if src.startswith("http") else f"https:{src}"
+                    audio_url = (
+                        src if src.startswith("http") else f"https:{src}"
+                    )
     except Exception as e:
         print(f"❌ Audio Scraper Warning: {e}")
 
@@ -255,35 +255,31 @@ async def check_student_answer(
         )
         return
 
-    # A. ပေႃး တွပ်ႇ ထုၵ်ႇမႅၼ်ႈ
     if student_text == target_word:
         celebration_effects = [
             "🎉✨💖 **ထုၵ်ႇမႅၼ်ႈယဝ်ႉၶႃႈ! ၵတ်ႉၶႅၼ်ႇလႅၼ်ႇလႅတ်း တႄႉတႄႉ!** ❤️💙",
             "🌟🥳 **မႅၼ်ႈဢမ်ႇမီးတီႈတီး! ၶႅမ်ႉလႅတ်းတႄႉတႄႉၶႃႈ!** 🎉✨",
         ]
 
-        # 1. Direct Insert Data to Supabase
         try:
             supabase_data = {
-    "author": user.full_name,
-    "category": mode,
-    "name_sci": target_word,
-    "name_tai": student_text,
-}
+                "author": user.full_name,
+                "category": mode,
+                "name_sci": target_word,
+                "name_tai": student_text,
+            }
 
             supabase.table("student_responses").insert(
                 supabase_data
             ).execute()
-            print(f"✅ Supabase Direct Saved Success!")
+            print("✅ Supabase Direct Saved Success!")
         except Exception as e:
             print(f"❌ Supabase Insert Error: {e}")
 
-        # 2. သူင်ႇ ႁူဝ်ၸႂ် / Confetti
         await update.message.reply_text(
             random.choice(celebration_effects), parse_mode="Markdown"
         )
 
-        # 3. Dynamic Fetch ၶေႃႈမႂ်ႇ တီႈ ဝဵပ်ႉၸဝ်ႈသြႃႇ
         online_words = fetch_words_from_wiktionary()
         available_words = [w for w in online_words if w != target_word]
         next_word = random.choice(
@@ -299,7 +295,6 @@ async def check_student_answer(
         )
         await update.message.reply_text(next_msg, parse_mode="Markdown")
 
-    # B. ပေႃး တွပ်ႇ ၽိတ်း
     else:
         wrong_msg = (
             f"❌ **ပႆႇထုၵ်ႇမႅၼ်ႈၶႃႈ!**\n\n"
@@ -310,28 +305,11 @@ async def check_student_answer(
         await update.message.reply_text(wrong_msg, parse_mode="Markdown")
 
 
-from telegram.request import HTTPXRequest
-
 # ---------------------------------------------------------
-# 4. Main Runner ( Fixed HTTPXRequest Proxy Argument )
+# 4. Main Runner ( Standard Runner for Koyeb / Cloud )
 # ---------------------------------------------------------
 if __name__ == "__main__":
-    # Standard Proxy URL တီႈ PythonAnywhere
-    PROXY_URL = "http://proxy.server:3128"
-
-    # 💡 မႄး တီႈၼႆႈ: ၸႂ်ႉ proxy=PROXY_URL (ဢမ်ႇၸႂ်ႉ proxy_url)
-    request_config = HTTPXRequest(
-        proxy=PROXY_URL, connect_timeout=30.0, read_timeout=30.0
-    )
-
-    # သႂ်ႇ request configuration ၶဝ်ႈ တီႈ ApplicationBuilder
-    app = (
-        ApplicationBuilder()
-        .token(TELEGRAM_TOKEN)
-        .request(request_config)
-        .get_updates_request(request_config)
-        .build()
-    )
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(handle_callback))
@@ -341,5 +319,5 @@ if __name__ == "__main__":
         )
     )
 
-    print("🤖 Bot Fixed & Running Perfectly on PythonAnywhere...")
+    print("🤖 Bot Running Successfully...")
     app.run_polling()
